@@ -1,5 +1,7 @@
 from app.schemas.transactor import TransactorCreate, TransactorUpdate, TransactorResponse
 from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryResponse
+from app.schemas.user import UserResponse, UserUpdate
+from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionResponse
 
 __all__ = [
     "TransactorCreate",
@@ -8,5 +10,10 @@ __all__ = [
     "CategoryCreate",
     "CategoryUpdate",
     "CategoryResponse",
+    "UserResponse",
+    "UserUpdate",
+    "TransactionCreate",
+    "TransactionUpdate",
+    "TransactionResponse",
 ]
 

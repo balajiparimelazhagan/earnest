@@ -1,10 +1,14 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from google.auth.transport.requests import Request
 from google.oauth2 import id_token
 from google_auth_oauthlib.flow import Flow
+from urllib.parse import urlencode
 import uuid
+import json
+import pickle
 
 from app.config import settings
 from app.dependencies import get_db
@@ -17,7 +21,12 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 # OAuth 2.0 scopes
-SCOPES = ['openid', 'https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email']
+SCOPES = [
+    'openid',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/gmail.readonly'  # Added Gmail read-only scope
+]
 
 
 @router.get("/google/signin")
@@ -137,6 +146,8 @@ async def google_callback(
             existing_user.token_expiry = token_expiry
             existing_user.name = name
             existing_user.picture = picture
+            existing_user.google_credentials_json = credentials.to_json()
+            existing_user.google_token_pickle = pickle.dumps(credentials)
             
             await db.commit()
             await db.refresh(existing_user)
@@ -145,13 +156,9 @@ async def google_callback(
             )
             
             logger.info(f"User already exists, tokens updated: {email}")
-            return {
-                "message": "User already exists, tokens updated",
-                "user_id": existing_user.id,
-                "email": existing_user.email,
-                "access_token": jwt_token,
-                "token_type": "bearer"
-            }
+            # Redirect to frontend dashboard with token
+            redirect_url = f"{settings.FRONTEND_BASE_URL}{settings.FORNTEND_LOGIN_REDIRECT_PATH}?{urlencode({'token': jwt_token})}"
+            return RedirectResponse(url=redirect_url)
 
         # Create new user using model
         new_user = User(
@@ -162,7 +169,9 @@ async def google_callback(
             picture=picture,
             access_token=access_token,
             refresh_token=refresh_token,
-            token_expiry=token_expiry
+            token_expiry=token_expiry,
+            google_credentials_json=credentials.to_json(),
+            google_token_pickle=pickle.dumps(credentials)
         )
         
         db.add(new_user)
@@ -175,13 +184,9 @@ async def google_callback(
         )
 
         logger.info(f"New user created with tokens: {email}")
-        return {
-            "message": "User created successfully",
-            "user_id": new_user.id,
-            "email": new_user.email,
-            "access_token": jwt_token,
-            "token_type": "bearer"
-        }
+        # Redirect to frontend dashboard with token
+        redirect_url = f"{settings.FRONTEND_BASE_URL}{settings.FORNTEND_LOGIN_REDIRECT_PATH}?{urlencode({'token': jwt_token})}"
+        return RedirectResponse(url=redirect_url)
 
     except ValueError as e:
         logger.error(f"Token verification failed: {e}")

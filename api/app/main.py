@@ -21,6 +21,10 @@ async def lifespan(app: FastAPI):
         logger.info("Starting up...")
         from app.db import connect_with_retry
         await connect_with_retry()
+        
+        # Email sync is now handled by Celery workers and Celery Beat
+        logger.info("Application started. Email sync handled by Celery workers.")
+        
         yield
     finally:
         logger.info("Shutting down...")
